@@ -13,6 +13,7 @@
 #import <WebKit/WebKit.h>
 
 @class MessageHandler;
+@class BinaryMessageHandler;
 @class UIDelegate;
 @class NavigationDelegate;
 
@@ -63,6 +64,14 @@ namespace saucer
 } // namespace saucer
 
 @interface MessageHandler : NSObject <WKScriptMessageHandler>
+{
+  @public
+    saucer::webview::impl *me;
+}
+- (instancetype)initWithParent:(saucer::webview::impl *)parent;
+@end
+
+@interface BinaryMessageHandler : NSObject <WKScriptMessageHandler>
 {
   @public
     saucer::webview::impl *me;

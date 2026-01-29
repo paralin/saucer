@@ -22,6 +22,7 @@
 
 #include <compare>
 #include <cstdint>
+#include <span>
 
 #include <set>
 #include <filesystem>
@@ -82,6 +83,7 @@ namespace saucer
             navigated,
             navigate,
             message,
+            binary_message,
             request,
             favicon,
             title,
@@ -96,6 +98,7 @@ namespace saucer
             ereignis::event<event::navigated, void(const saucer::url &)>,                             //
             ereignis::event<event::navigate, policy(const navigation &)>,                             //
             ereignis::event<event::message, status(std::string_view)>,                                //
+            ereignis::event<event::binary_message, status(std::span<const std::uint8_t>)>,            //
             ereignis::event<event::request, void(const saucer::url &)>,                               //
             ereignis::event<event::favicon, void(const icon &)>,                                      //
             ereignis::event<event::title, void(std::string_view)>,                                    //

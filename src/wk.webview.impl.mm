@@ -81,6 +81,11 @@ namespace saucer
     }
 
     template <>
+    void native::setup<event::binary_message>(impl *)
+    {
+    }
+
+    template <>
     void native::setup<event::request>(impl *)
     {
     }
@@ -377,6 +382,52 @@ using namespace saucer;
 - (void)webView:(WKWebView *)webview didFinishNavigation:(WKNavigation *)navigation
 {
     me->events.get<event::load>().fire(state::finished);
+}
+@end
+
+@implementation BinaryMessageHandler
+- (instancetype)initWithParent:(webview::impl *)parent
+{
+    self     = [super init];
+    self->me = parent;
+
+    return self;
+}
+
+- (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)raw
+{
+    const utils::autorelease_guard guard{};
+
+    const id body = raw.body;
+
+    if (![body isKindOfClass:[NSDictionary class]])
+    {
+        return;
+    }
+
+    NSDictionary *dict = body;
+    NSNumber *length   = dict[@"length"];
+    NSArray *packed    = dict[@"data"];
+
+    if (!length || !packed)
+    {
+        return;
+    }
+
+    const auto byte_count = length.unsignedIntegerValue;
+    std::vector<std::uint8_t> bytes(byte_count);
+
+    for (NSUInteger i = 0; i < packed.count; i++)
+    {
+        std::uint32_t val = [packed[i] unsignedIntValue];
+        // Unpack 4 bytes from each uint32
+        for (int j = 0; j < 4 && (i * 4 + j) < bytes.size(); j++)
+        {
+            bytes[i * 4 + j] = (val >> (j * 8)) & 0xFF;
+        }
+    }
+
+    me->events.get<event::binary_message>().fire(std::span<const std::uint8_t>(bytes)).find(status::handled);
 }
 @end
 

@@ -57,6 +57,9 @@ namespace saucer
         auto *const handler = [[[MessageHandler alloc] initWithParent:this] autorelease];
         [platform->controller addScriptMessageHandler:handler name:@"saucer"];
 
+        auto *const binary_handler = [[[BinaryMessageHandler alloc] initWithParent:this] autorelease];
+        [platform->controller addScriptMessageHandler:binary_handler name:@"saucer_binary"];
+
         static constexpr auto resize_mask = NSViewWidthSizable | NSViewMaxXMargin | NSViewHeightSizable | NSViewMaxYMargin;
         [platform->web_view.get() setAutoresizingMask:resize_mask];
 
@@ -396,6 +399,10 @@ namespace saucer
             message: async (message) =>
             {
                 window.webkit.messageHandlers.saucer.postMessage(message);
+            },
+            binaryMessage: (length, data) =>
+            {
+                window.webkit.messageHandlers.saucer_binary.postMessage({length, data});
             }
         )js");
 

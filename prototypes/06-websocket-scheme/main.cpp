@@ -6,7 +6,7 @@
 //
 // Transport:
 // - Server → Client: Streaming scheme (single long-lived connection)
-// - Client → Server: POST requests to the scheme
+// - Client → Server: Binary message handler (packed 32-bit integers via IPC)
 //
 // Framing: Standard WebSocket frame format (RFC 6455)
 //
@@ -23,6 +23,7 @@
 #include <format>
 #include <mutex>
 #include <random>
+#include <span>
 #include <thread>
 #include <vector>
 
@@ -439,13 +440,10 @@ static constexpr auto html_template = R"html(
             };
         }
 
-        async function sendFrame(opcode, payload) {
+        function sendFrame(opcode, payload) {
             const frame = encodeFrame(opcode, payload);
-            try {
-                await fetch('wsock://localhost/send', { method: 'POST', body: frame });
-            } catch (e) {
-                log(`Send error: ${e.message}`, 'error');
-            }
+            // Use binary message handler instead of POST for efficient IPC
+            window.saucer.internal.sendBinary(frame);
         }
 
         async function connect() {
@@ -559,19 +557,24 @@ coco::stray start(saucer::application *app)
     window->set_title("WebSocket over Custom Scheme");
     window->set_size({800, 600});
 
-    const std::map<std::string, std::string> cors = {
-        {"Access-Control-Allow-Origin", "*"},
-        {"Access-Control-Allow-Methods", "GET, POST, OPTIONS"},
-        {"Access-Control-Allow-Headers", "Content-Type"},
-    };
-
     webview->on<saucer::webview::event::dom_ready>([&]() {
         std::fprintf(stderr, "[SAUCER] DOM ready\n");
         g_dom_ready = true;
     });
 
+    // Register binary message handler for client → server frames
+    webview->on<saucer::webview::event::binary_message>(
+        [](std::span<const std::uint8_t> data) {
+            auto result = WsFrame::decode(data.data(), data.size());
+            if (result)
+            {
+                g_from_client.push(std::move(result->first));
+            }
+            return saucer::status::handled;
+        });
+
     webview->handle_stream_scheme("wsock",
-        [cors](saucer::scheme::request req, saucer::scheme::stream_writer writer)
+        [](saucer::scheme::request req, saucer::scheme::stream_writer writer)
         {
             const auto path = req.url().path();
 
@@ -583,17 +586,6 @@ coco::stray start(saucer::application *app)
                 g_pings_sent = 0;
                 g_pongs_received = 0;
                 std::thread(websocket_server_thread, std::move(writer)).detach();
-            }
-            else if (path == "/send")
-            {
-                auto content = req.content();
-                auto result = WsFrame::decode(content.data(), content.size());
-                if (result)
-                {
-                    g_from_client.push(std::move(result->first));
-                }
-                writer.start({.mime = "text/plain", .headers = cors, .status = 204});
-                writer.finish();
             }
             else
             {

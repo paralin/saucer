@@ -5,9 +5,9 @@
 namespace saucer::scripts
 {
     static constexpr std::string_view ipc_script = R"js(
-    window.saucer = 
+    window.saucer =
     {{
-        internal: 
+        internal:
         {{
             idc: 0,
             rpc: [],
@@ -28,6 +28,15 @@ namespace saucer::scripts
                 }}));
 
                 return promise;
+            }},
+            sendBinary: (data) =>
+            {{
+                // Pack bytes into 32-bit integers (4 bytes each) for efficient transfer
+                const packed = new Uint32Array(Math.ceil(data.length / 4));
+                for (let i = 0; i < data.length; i++) {{
+                    packed[i >> 2] |= data[i] << ((i & 3) * 8);
+                }}
+                window.saucer.internal.binaryMessage(data.length, Array.from(packed));
             }},
             {0}
         }},

@@ -1,12 +1,22 @@
 # Prototype 06: WebSocket over Custom Scheme
 
-Implements WebSocket protocol framing (RFC 6455) over the saucer streaming scheme API. No actual TCP sockets are used - all communication goes through custom URL scheme handlers.
+Implements WebSocket protocol framing (RFC 6455) over the saucer streaming scheme API. No actual TCP sockets are used - all communication goes through custom URL scheme handlers and IPC.
 
 ## How It Works
 
 ### Transport Layer
-- **Server → Client**: Uses the streaming scheme (`wsock://localhost/connect`) for a long-lived connection
-- **Client → Server**: Uses POST requests to `wsock://localhost/send`
+- **Server → Client**: Streaming scheme (`wsock://localhost/connect`) provides a long-lived readable stream
+- **Client → Server**: Binary message handler via `WKScriptMessageHandler.postMessage()` - direct IPC with no HTTP overhead
+
+Both directions avoid HTTP request/response overhead, making this potentially faster than real WebSocket for same-process communication.
+
+### Binary Packing (Client → Server)
+To efficiently transfer binary data from JavaScript to C++:
+1. JavaScript packs 4 bytes into each 32-bit unsigned integer
+2. Sends as `Uint32Array` → converted to NSArray of NSNumbers by WebKit
+3. C++ unpacks the array back to bytes
+
+This is ~4x more efficient than sending 1 byte per NSNumber.
 
 ### WebSocket Framing
 Standard WebSocket frame format is used:
@@ -47,16 +57,16 @@ Automatically:
 │                        WebView (JS)                         │
 ├─────────────────────────────────────────────────────────────┤
 │  fetch('wsock://localhost/connect')  →  ReadableStream     │
-│  fetch('wsock://localhost/send', POST) →  Send frames      │
+│  window.saucer.internal.sendBinary() →  Binary IPC         │
 │                                                             │
 │  [WebSocket Frame Encode/Decode in JavaScript]              │
 └─────────────────────────────────────────────────────────────┘
                             ↕
 ┌─────────────────────────────────────────────────────────────┐
-│                 Streaming Scheme Handler                     │
+│              Scheme Handler + Binary Message Handler        │
 ├─────────────────────────────────────────────────────────────┤
-│  /connect  →  stream_writer (long-lived)                    │
-│  /send     →  Receive frames, push to queue                 │
+│  /connect         →  stream_writer (long-lived response)   │
+│  binary_message   →  Receive frames via IPC, push to queue │
 │                                                             │
 │  [WebSocket Frame Encode/Decode in C++]                     │
 └─────────────────────────────────────────────────────────────┘
@@ -65,6 +75,7 @@ Automatically:
 ## Key Differences from Native WebSocket
 
 1. **No TCP handshake** - Uses scheme handler directly
-2. **Unidirectional streams** - Server→client via streaming, client→server via POST
+2. **Efficient bidirectional** - Streaming for server→client, IPC for client→server
 3. **Custom scheme** - Uses `wsock://` instead of `ws://`
 4. **Same-process** - All communication stays within the app process
+5. **No HTTP overhead** - Binary message handler bypasses HTTP entirely for client→server

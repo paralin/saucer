@@ -6,7 +6,7 @@
 //
 // Transport:
 // - Server → Client: Streaming scheme (single long-lived connection)
-// - Client → Server: Binary message handler (packed 32-bit integers via IPC)
+// - Client → Server: Binary message handler (IPC, no HTTP overhead)
 //
 // Framing: Standard WebSocket frame format (RFC 6455)
 //
@@ -442,7 +442,7 @@ static constexpr auto html_template = R"html(
 
         function sendFrame(opcode, payload) {
             const frame = encodeFrame(opcode, payload);
-            // Use binary message handler instead of POST for efficient IPC
+            // Use binary message IPC instead of POST
             window.saucer.internal.sendBinary(frame);
         }
 
@@ -562,7 +562,7 @@ coco::stray start(saucer::application *app)
         g_dom_ready = true;
     });
 
-    // Register binary message handler for client → server frames
+    // Binary message handler for client → server frames (replaces POST to /send)
     webview->on<saucer::webview::event::binary_message>(
         [](std::span<const std::uint8_t> data) {
             auto result = WsFrame::decode(data.data(), data.size());
@@ -576,9 +576,7 @@ coco::stray start(saucer::application *app)
     webview->handle_stream_scheme("wsock",
         [](saucer::scheme::request req, saucer::scheme::stream_writer writer)
         {
-            const auto path = req.url().path();
-
-            if (path == "/connect")
+            if (req.url().path() == "/connect")
             {
                 std::fprintf(stderr, "[WS] /connect request\n");
                 g_running = true;

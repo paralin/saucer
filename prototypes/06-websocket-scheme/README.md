@@ -5,10 +5,10 @@ Implements WebSocket protocol framing (RFC 6455) over the saucer streaming schem
 ## How It Works
 
 ### Transport Layer
-- **Server → Client**: Streaming scheme (`wsock://localhost/connect`) provides a long-lived readable stream
-- **Client → Server**: Binary message handler via `WKScriptMessageHandler.postMessage()` - direct IPC with no HTTP overhead
+- **Server → Client**: Uses the streaming scheme (`wsock://localhost/connect`) for a long-lived connection
+- **Client → Server**: Uses binary message handler via `WKScriptMessageHandler.postMessage()` - direct IPC with no HTTP overhead
 
-Both directions avoid HTTP request/response overhead, making this potentially faster than real WebSocket for same-process communication.
+Both directions avoid HTTP request/response overhead per message.
 
 ### Binary Packing (Client → Server)
 To efficiently transfer binary data from JavaScript to C++:

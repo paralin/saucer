@@ -227,6 +227,7 @@ namespace saucer
       public:
         bool attributes{true};
         bool persistent_cookies{true};
+        bool non_persistent_data_store{false};
         bool hardware_acceleration{true};
 
       public:

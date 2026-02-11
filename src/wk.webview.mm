@@ -41,12 +41,19 @@ namespace saucer
         [platform->web_view.get() setUIDelegate:platform->ui_delegate.get()];
         [platform->web_view.get() setNavigationDelegate:platform->navigation_delegate.get()];
 
-        auto *const uuid  = native::data_store_id(opts, parent->native<false>()->platform->id);
-        auto *const store = [WKWebsiteDataStore dataStoreForIdentifier:uuid];
+        if (!opts.non_persistent_data_store)
+        {
+            auto *const uuid  = native::data_store_id(opts, parent->native<false>()->platform->id);
+            auto *const store = [WKWebsiteDataStore dataStoreForIdentifier:uuid];
 
-        [uuid autorelease];
+            [uuid autorelease];
 
-        [platform->config.get() setWebsiteDataStore:store];
+            [platform->config.get() setWebsiteDataStore:store];
+        }
+        else
+        {
+            [platform->config.get() setWebsiteDataStore:[WKWebsiteDataStore nonPersistentDataStore]];
+        }
         [platform->config.get().preferences setElementFullscreenEnabled:YES];
 
 #ifdef SAUCER_WEBKIT_PRIVATE
